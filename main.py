@@ -13,7 +13,7 @@ st.title("🗺️ 서울 자치구 청소년 인구 비율 대시보드")
 st.caption("CSV는 GitHub에서 직접 불러옵니다. 자치구별 청소년 인구 비율을 분석합니다.")
 
 # ✅ GitHub CSV URL
-CSV_URL = "https://raw.githubusercontent.com/your-username/your-repo/main/studentPopulation.csv"
+CSV_URL = "https://raw.githubusercontent.com/shine122948/dataproject3/refs/heads/main/studentPopulation.csv"
 
 @st.cache_data
 def load_csv_from_github(url):
