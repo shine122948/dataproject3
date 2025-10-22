@@ -1,102 +1,92 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import requests
 import folium
 from folium.plugins import MousePosition
 from branca.colormap import LinearColormap
 from streamlit_folium import st_folium
 import plotly.express as px
+import requests
 
-st.set_page_config(page_title="서울 자치구 청소년 인구 비율 대시보드", layout="wide")
-st.title("🗺️ 서울 자치구 청소년 인구 비율 대시보드")
-st.caption("CSV는 GitHub에서 직접 불러옵니다. 자치구별 청소년 인구 비율을 분석합니다.")
+st.set_page_config(page_title="서울 자치구별 청소년 인구 비율 대시보드", layout="wide")
 
-# GitHub RAW CSV URL – 실제 파일명/경로 확인 후 변경하세요
-CSV_URL = "https://raw.githubusercontent.com/shine122948/dataproject3/main/studentPopulation.csv"
+st.title("🗺️ 서울 자치구별 청소년 인구 비율 대시보드")
+st.caption("서울 각 자치구의 청소년 인구 구성비를 시각화합니다. (데이터 출처: dataproject3 깃허브 저장소)")
 
+# 🔹 CSV 불러오기 (GitHub raw URL)
 @st.cache_data
-def load_csv_from_github(url):
+def load_data():
+    url = "https://raw.githubusercontent.com/<YOUR_GITHUB_USERNAME>/dataproject3/main/studentPopulation.csv"
+    # 위 <YOUR_GITHUB_USERNAME> 부분을 본인 깃허브 ID로 바꿔주세요.
     try:
-        df = pd.read_csv(url, encoding='utf-8-sig')
+        df = pd.read_csv(url)
     except UnicodeDecodeError:
         df = pd.read_csv(url, encoding='cp949')
-    # 컬럼명 정리: 앞뒤 공백 제거, BOM 제거
-    df.columns = df.columns.str.strip().str.replace('\ufeff', '', regex=True)
-    return df
 
+    # 통계청 형식 (상단 2행 헤더) 정리
+    df = df.iloc[2:].copy()
+    df.rename(columns={'자치구별(2)': '자치구'}, inplace=True)
+    df = df[df['자치구'].notna() & (df['자치구'] != '소계')]
+    df['자치구'] = df['자치구'].astype(str).str.strip()
+    df['청소년비율(%)'] = pd.to_numeric(df['2024.2'], errors='coerce')  # 9~24세 구성비
+    return df[['자치구', '청소년비율(%)']]
+
+df = load_data()
+
+# 🔹 GeoJSON 불러오기
 @st.cache_data
 def load_geojson():
     url = "https://raw.githubusercontent.com/southkorea/seoul-maps/master/kostat/2013/json/seoul_municipalities_geo_simple.json"
-    r = requests.get(url, timeout=20)
-    r.raise_for_status()
+    r = requests.get(url)
     return r.json()
 
-df = load_csv_from_github(CSV_URL)
+geo = load_geojson()
 
-# 열 목록 출력해서 확인
-st.write("### CSV 열 목록:", df.columns.tolist())
+# 🔹 지도 표시
+st.subheader("🌍 서울 자치구별 청소년 인구 비율 (Folium 지도)")
 
-# 자치구 컬럼 자동 탐색 및 이름 통일
-if '자치구' not in df.columns:
-    for c in df.columns:
-        if '자치구' in c:
-            df = df.rename(columns={c: '자치구'})
-            break
-
-# 비율(%) 컬럼 탐색
-ratio_cols = [c for c in df.columns if ('구성비' in c) or ('비율' in c) or ('%' in c)]
-if not ratio_cols:
-    st.error("적절한 비율(%) 컬럼을 찾을 수 없습니다. CSV의 열명을 확인해주세요.")
-    st.stop()
-
-# 기본 지표 선택
-default_metric = ratio_cols[0]
-
-st.sidebar.header("지표 선택")
-metric = st.sidebar.selectbox("시각화할 지표", options=ratio_cols, index=0 if default_metric in ratio_cols else 0)
-target_gu = st.sidebar.selectbox("자치구 강조 선택", options=df['자치구'].dropna().unique().tolist(), index=0)
-
-# 숫자 변환 및 데이터 정리
-df[metric] = pd.to_numeric(df[metric].astype(str).str.replace(',', ''), errors='coerce')
-work = df[['자치구', metric]].dropna(subset=[metric])
-work = work[~work['자치구'].str.contains('합계|소계', na=False)]
-work = work.reset_index(drop=True)
-
-geoj = load_geojson()
-
-vmin, vmax = float(work[metric].min()), float(work[metric].max())
-cmap = LinearColormap(colors=["#ffeaea", "#ff8080", "#ff1a1a", "#d30000"], vmin=vmin, vmax=vmax)
-cmap.caption = f"{metric} (높을수록 빨강)"
-
-value_map = dict(zip(work['자치구'], work[metric]))
+vmin, vmax = df['청소년비율(%)'].min(), df['청소년비율(%)'].max()
+cmap = LinearColormap(
+    colors=["#ffeaea", "#ffb3b3", "#ff8080", "#ff4d4d", "#ff1a1a", "#d30000"],
+    vmin=vmin, vmax=vmax
+)
+cmap.caption = "청소년 인구 비율 (%)"
 
 m = folium.Map(location=[37.5665, 126.9780], zoom_start=11, tiles="cartodbpositron")
 
+value_map = dict(zip(df['자치구'], df['청소년비율(%)']))
+
 folium.GeoJson(
-    geoj,
+    geo,
     name="서울 자치구",
-    style_function=lambda f: {
-        "fillColor": cmap(value_map.get(f["properties"]["name"], vmin)),
+    style_function=lambda feature: {
+        "fillColor": cmap(value_map.get(feature["properties"]["name"], vmin)),
         "color": "white",
         "weight": 1,
         "fillOpacity": 0.8,
     },
-    tooltip=folium.GeoJsonTooltip(fields=["name"], aliases=["자치구"]),
+    tooltip=folium.GeoJsonTooltip(fields=["name"], aliases=["자치구"], labels=True),
 ).add_to(m)
 
 MousePosition().add_to(m)
-st_folium(m, height=560, use_container_width=True)
+st_folium(m, height=600, use_container_width=True)
 
-# 막대그래프
-plot_df = work.sort_values(metric, ascending=False)
-colors = ['#d30000' if gu == target_gu else '#4da6ff' for gu in plot_df['자치구']]
-fig = px.bar(plot_df, x='자치구', y=metric, title=f"{metric} (자치구 비교)")
-fig.update_traces(marker_color=colors)
-fig.update_layout(xaxis_title="자치구", yaxis_title=metric, height=520)
+# 🔹 막대그래프 (Plotly)
+st.subheader("📊 자치구별 청소년 인구 비율 (Bar Chart)")
+
+df_sorted = df.sort_values("청소년비율(%)", ascending=False)
+colors = ["#d30000" if i == 0 else "#ff8080" for i in range(len(df_sorted))]
+
+fig = px.bar(
+    df_sorted,
+    x="자치구",
+    y="청소년비율(%)",
+    color="청소년비율(%)",
+    color_continuous_scale="Reds",
+    title="서울 자치구별 청소년 인구 비율 (%)",
+)
+fig.update_layout(xaxis_title="자치구", yaxis_title="청소년 인구 비율 (%)", height=500)
 st.plotly_chart(fig, use_container_width=True)
 
+# 🔹 데이터 미리보기
 with st.expander("데이터 미리보기"):
-    st.dataframe(work, use_container_width=True)
-
-st.caption("📊 CSV 출처: GitHub 리포지토리 / GeoJSON 출처: southkorea/seoul-maps")
+    st.dataframe(df)
