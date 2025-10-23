@@ -21,8 +21,10 @@ st.write("🔍 CSV 열 이름:", df.columns.tolist())
 
     try:
         df = pd.read_csv(url)
+        st.write("🔍 CSV 열 이름:", df.columns.tolist())
     except UnicodeDecodeError:
         df = pd.read_csv(url, encoding='utf-8-sig')
+        st.write("🔍 CSV 열 이름:", df.columns.tolist())
 
     # 통계청 형식 (상단 2행 헤더) 정리
     df = df.iloc[2:].copy()
