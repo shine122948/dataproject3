@@ -24,7 +24,7 @@ def load_data():
 
     # 통계청 형식 (상단 2행 헤더) 정리
     df = df.iloc[2:].copy()
-    df.rename(columns={'자치구별(2)': '자치구'}, inplace=True)
+    df.rename(columns={'자치구별': '자치구'}, inplace=True)
     df = df[df['자치구'].notna() & (df['자치구'] != '소계')]
     df['자치구'] = df['자치구'].astype(str).str.strip()
     df['청소년비율(%)'] = pd.to_numeric(df['2024.2'], errors='coerce')  # 9~24세 구성비
