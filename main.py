@@ -15,7 +15,7 @@ st.caption("서울 각 자치구의 청소년 인구 구성비를 시각화합�
 # 🔹 CSV 불러오기 (GitHub raw URL)
 @st.cache_data
 def load_data():
-    url = "https://raw.githubusercontent.com/shine122948/dataproject3/refs/heads/main/requirements.txt"
+    url = "https://github.com/shine122948/dataproject3/blob/main/studentPopulation.csv"
     # 위 <YOUR_GITHUB_USERNAME> 부분을 본인 깃허브 ID로 바꿔주세요.
 
     try:
