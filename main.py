@@ -17,6 +17,8 @@ st.caption("서울 각 자치구의 청소년 인구 구성비를 시각화합�
 def load_data():
     url = "https://raw.githubusercontent.com/shine122948/dataproject3/refs/heads/main/requirements.txt"
     # 위 <YOUR_GITHUB_USERNAME> 부분을 본인 깃허브 ID로 바꿔주세요.
+    st.write("🔍 CSV 열 이름:", df.columns.tolist())
+
     try:
         df = pd.read_csv(url)
     except UnicodeDecodeError:
